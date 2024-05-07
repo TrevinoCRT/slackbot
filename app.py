@@ -1,7 +1,7 @@
 import os
 import asyncio
 import threading
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, abort
 import uuid
 import requests
 
@@ -23,9 +23,21 @@ MIRO_CLIENT_ID = os.environ.get("MIRO_CLIENT_ID")
 MIRO_CLIENT_SECRET = os.environ.get("MIRO_CLIENT_SECRET")
 MIRO_REDIRECT_URI = os.environ.get("MIRO_REDIRECT_URI")
 
+AUTHORIZED_USER_IDS = os.environ.get("AUTHORIZED_USER_IDS", "")
+
+def is_authorized_user(user_id):
+    authorized_ids = AUTHORIZED_USER_IDS.split(',')
+    return user_id in authorized_ids
+
 @app.route('/slack/events', methods=['POST'])
 def slack_events():
     data = request.json
+    user_id = data.get('event', {}).get('user')
+
+    if not is_authorized_user(user_id):
+        logger.warning(f"Unauthorized access attempt by user ID: {user_id}")
+        abort(403)  # Abort the request with a 403 Forbidden status
+
     logger.debug(f"Received Slack event data: {data}")
 
     # Handle URL verification from Slack
@@ -76,51 +88,48 @@ def process_message(event):
             )
     loop.close()
 
-
 @slack_app.message("")
 def message_handler(message, say, ack):
     ack()
     user_id = message.get('user')
+
+    if not is_authorized_user(user_id):
+        logger.warning(f"Unauthorized message from user ID: {user_id}")
+        return  # Simply return without processing the message
+
     logger.debug(f"Received message from user: {user_id}")
-    authorized_user_id = "U0581M58KAM"
+    user_query = message['text']
+    assistant_id = os.environ.get('ASSISTANT_ID')
+    from_user = message['user']
+    thread_ts = message['ts']  # Get the timestamp of the user's message to use as thread_ts
+    logger.debug(f"Authorized user {from_user} sent a query: {user_query}")
 
-    if user_id and user_id == authorized_user_id:
-        user_query = message['text']
-        assistant_id = os.environ.get('ASSISTANT_ID')
-        from_user = message['user']
-        thread_ts = message['ts']  # Get the timestamp of the user's message to use as thread_ts
-        logger.debug(f"Authorized user {from_user} sent a query: {user_query}")
+    def process_and_respond():
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        logger.debug("Event loop set for async processing.")
 
-        def process_and_respond():
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            logger.debug("Event loop set for async processing.")
+        async def async_process_and_respond():
+            response = await process_thread_with_assistant(user_query, assistant_id, from_user=from_user)
+            if response:
+                for text in response.get("text", []):
+                    slack_app.client.chat_postMessage(
+                        channel=message['channel'],
+                        text=text,
+                        mrkdwn=True,
+                        thread_ts=thread_ts  # Post the response in the same thread
+                    )
+            else:
+                say("Sorry, I couldn't process your request.", thread_ts=thread_ts)
+            logger.info("Response processed and sent to user.")
 
-            async def async_process_and_respond():
-                response = await process_thread_with_assistant(user_query, assistant_id, from_user=from_user)
-                if response:
-                    for text in response.get("text", []):
-                        slack_app.client.chat_postMessage(
-                            channel=message['channel'],
-                            text=text,
-                            mrkdwn=True,
-                            thread_ts=thread_ts  # Post the response in the same thread
-                        )
-                else:
-                    say("Sorry, I couldn't process your request.", thread_ts=thread_ts)
-                logger.info("Response processed and sent to user.")
+        loop.run_until_complete(async_process_and_respond())
 
-            loop.run_until_complete(async_process_and_respond())
-
-        threading.Thread(target=process_and_respond).start()
-        logger.debug("Processing user query in a separate thread.")
-
-    else:
-        logger.warning("Unauthorized or missing user ID in message event.")
-
+    threading.Thread(target=process_and_respond).start()
+    logger.debug("Processing user query in a separate thread.")
 
 @slack_app.event("app_home_opened")
 def update_home_tab(client, event, logger):
