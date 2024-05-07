@@ -1,20 +1,27 @@
 import os
-from slack_bolt import App
-from slack_bolt.adapter.flask import SlackRequestHandler
-import threading
 import asyncio
+import threading
 from flask import Flask, request, redirect, url_for
 import uuid
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
-from shared import logger, db, slack_app
-# Load environment variables and initialize Slack app
+from slack_bolt import App
+from slack_bolt.adapter.flask import SlackRequestHandler
+from loguru import logger
+from assistants import process_thread_with_assistant
 
+# Initialize logger
+logger.add("debug.log", format="{time} {level} {message}", level="DEBUG")
+
+# Load environment variables
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
+# Initialize Slack app
 app = Flask(__name__)
-slack_app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+slack_app = App(token=SLACK_BOT_TOKEN)
 slack_handler = SlackRequestHandler(slack_app)
-logger.debug("Slack app initialized with the provided token.")
 
 # Initialize Firestore DB
 if not firebase_admin._apps:
@@ -22,18 +29,15 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Jira OAuth Configuration
+# OAuth Configuration
 JIRA_CLIENT_ID = os.environ.get("JIRA_CLIENT_ID")
 JIRA_CLIENT_SECRET = os.environ.get("JIRA_CLIENT_SECRET")
 JIRA_SCOPES = os.environ.get("JIRA_SCOPES")
 REDIRECT_URI = os.environ.get("REDIRECT_URI")
 TOKEN_URL = os.environ.get("TOKEN_URL")
-
 MIRO_CLIENT_ID = os.environ.get("MIRO_CLIENT_ID")
 MIRO_CLIENT_SECRET = os.environ.get("MIRO_CLIENT_SECRET")
 MIRO_REDIRECT_URI = os.environ.get("MIRO_REDIRECT_URI")
-# Import the function from assistants.py
-from assistants import process_thread_with_assistant
 
 @app.route('/slack/events', methods=['POST'])
 def slack_events():

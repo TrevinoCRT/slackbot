@@ -4,7 +4,7 @@ import os
 
 
 from openai import AsyncOpenAI
-from shared import retrieve_tokens, logger, slack_app
+from app import slack_app, logger, db 
 from miro_data_assistant import analyze_miro_board_data
 from jira_board_info import retrieve_jira_issue, update_issue_summary_and_description, get_issues_for_epic, create_new_jira_issue
 
@@ -15,6 +15,23 @@ global_thread_id = None
 
 # Initialize OpenAI API client
 client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+def retrieve_tokens(user_id, service):
+    """
+    Retrieves access tokens for a specified service from Firestore.
+    """
+    try:
+        doc_ref = db.collection(u'users').document(user_id)
+        user_doc = doc_ref.get()
+        if user_doc.exists:
+            service_tokens = user_doc.to_dict().get(service, {})
+            return service_tokens
+        else:
+            logger.info(f"No token found for {service} for user {user_id}.")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to retrieve tokens for {service} for user {user_id}: {str(e)}")
+        return None
 
 async def execute_function(function_name, arguments, from_user):
     # Retrieve tokens for both Miro and Jira using the user ID
