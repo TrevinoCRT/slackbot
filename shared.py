@@ -4,15 +4,8 @@ from logger_config import setup_logger
 from google.cloud import exceptions
 from slack_bolt import App
 import os
-
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
-
-if not SLACK_BOT_TOKEN:
-    logger = setup_logger()
-    logger.error("SLACK_BOT_TOKEN environment variable not set.")
-    slack_app = App(token="default_token")  # Initialize with default token
-else:
-    slack_app = App(token=SLACK_BOT_TOKEN)
+# Initialize Slack app
+slack_app = App(token=os.getenv("SLACK_BOT_TOKEN"))
 
 if not firebase_admin._apps:
     cred = credentials.Certificate("ServiceAccountKey.json")
