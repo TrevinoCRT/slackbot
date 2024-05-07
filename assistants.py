@@ -4,7 +4,7 @@ import os
 
 
 from openai import AsyncOpenAI
-from app import slack_app, logger, db 
+from shared_resources import slack_app, logger, db
 from miro_data_assistant import analyze_miro_board_data
 from jira_board_info import retrieve_jira_issue, update_issue_summary_and_description, get_issues_for_epic, create_new_jira_issue
 

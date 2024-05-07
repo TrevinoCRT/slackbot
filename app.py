@@ -4,30 +4,14 @@ import threading
 from flask import Flask, request, redirect, url_for
 import uuid
 import requests
-import firebase_admin
-from firebase_admin import credentials, firestore
-from slack_bolt import App
+
+from shared_resources import slack_app, logger, db
 from slack_bolt.adapter.flask import SlackRequestHandler
-from loguru import logger
 from assistants import process_thread_with_assistant
 
-# Initialize logger
-logger.add("debug.log", format="{time} {level} {message}", level="DEBUG")
-
-# Load environment variables
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
-# Initialize Slack app
+# Initialize Flask app
 app = Flask(__name__)
-slack_app = App(token=SLACK_BOT_TOKEN)
 slack_handler = SlackRequestHandler(slack_app)
-
-# Initialize Firestore DB
-if not firebase_admin._apps:
-    cred = credentials.Certificate("ServiceAccountKey.json")
-    firebase_admin.initialize_app(cred)
-db = firestore.client()
 
 # OAuth Configuration
 JIRA_CLIENT_ID = os.environ.get("JIRA_CLIENT_ID")
