@@ -1,0 +1,12 @@
+aiohttp
+requests
+python-dotenv
+openai
+slack_bolt
+google-cloud-firestore
+firebase-admin
+loguru
+python-dotenv
+Flask==3.0.0
+gunicorn==22.0.0
+Werkzeug==3.0.1

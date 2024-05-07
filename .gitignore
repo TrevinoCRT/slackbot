@@ -1,0 +1,6 @@
+google-cloud-sdk/
+pycache/
+ServiceAccountKey.json
+SlackOpenAIDrumbeat.code-workspace
+.DS_Store
+.env
