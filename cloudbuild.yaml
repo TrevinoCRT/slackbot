@@ -1,0 +1,12 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/slackbot:$COMMIT_SHA', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/slackbot:$COMMIT_SHA']
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['run', 'deploy', 'slackbot-service', '--image', 'gcr.io/$PROJECT_ID/slackbot:$COMMIT_SHA', '--platform', 'managed', '--region', 'us-central1']
+timeout: '1600s'
+options:
+  env:
+    - 'CLOUDSDK_COMPUTE_REGION=us-central1'
+    - 'CLOUDSDK_CORE_DISABLE_PROMPTS=1'
